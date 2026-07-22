@@ -1,0 +1,142 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: checkout
+spec:
+  params:
+  - name: gitRepoUrl
+    type: string
+  - name: gitRepoBranch
+    type: string
+  - name: gitRepoName
+    type: string
+  workspaces:
+    - name: git-source
+      mountPath: /workspace
+  steps:
+  - name: git-clone
+    image: 172.16.30.135/devops/git:v2.32.0-alpine
+    workingDir: /workspace
+    script: |
+      #/bin/sh
+      echo "$(params.gitRepoUrl) | $(params.gitRepoBranch)"
+      git clone -b $(params.gitRepoBranch) $(params.gitRepoUrl)
+      ls -la "$(params.gitRepoName)"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: build
+spec:
+  params:
+  - name: buildCmd
+    type: string
+    description: "请输入构建命令"
+    default: "mvn clean package -DskipTest"
+  - name: gitRepoName
+    type: string
+  workspaces:
+  - name: git-source
+    mountPath: /workspace
+  steps:
+  - name: build-package
+    # image: maven:3.9.16-eclipse-temurin-17-noble
+    image: 172.16.30.135/devops/maven:3.9.16-eclipse-temurin-17-noble
+    workingDir: $(workspaces.git-source.path)
+    env:
+    - name: MAVEN_OPTS
+      value: "-Dmaven.repo.local=/root/.m2/repository"
+    volumeMounts:
+    - name: m2
+      mountPath: /root/.m2
+    script: |
+      #!/bin/sh
+      ls -l
+      cd $(params.gitRepoName)
+      $(params.buildCmd)
+  volumes:
+  - name: m2
+    persistentVolumeClaim:
+      claimName: maven-cache-pvc
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: image
+spec:
+  params:
+  - name: harborUrl
+    type: string
+  - name: gitRepoFullName
+    type: string
+  - name: gitRepoName
+    type: string
+  workspaces:
+  - name: git-source
+    mountPath: /workspace
+  results:
+  - name: imageFullName
+    description: "镜像名称"
+  steps:
+  - name: buildah-image
+    # image: quay.io/buildah/stable
+    image: 172.16.30.135/devops/buildah:stable
+    workingDir: $(workspaces.git-source.path)
+    securityContext:
+      privileged: true
+      capabilities:
+        add:
+        - SYS_ADMIN
+    env:
+    - name: TZ
+      value: "Asia/Shanghai"
+    - name: BUILD_REGISTRY_SOURCES
+      value: '{"insecureRegistries": ["172.16.30.135"]}'
+    script: |
+      set -e
+      dateTime="$(date '+%Y%m%d%H%M%S')"
+      imageTag=v${dateTime}
+      imageFullName="$(params.harborUrl)/$(params.gitRepoFullName):${imageTag}"
+      echo -n ${imageFullName} | tee $(results.imageFullName.path)
+      cd $(params.gitRepoName)
+      export BUILDAH_REGISTRY_TLS_VERIFY=0
+      echo "ui" | buildah login --tls-verify=false -u registry --password-stdin 172.16.30.135
+      buildah --tls-verify=false  bud -t ${imageFullName} .
+      buildah push --tls-verify=false ${imageFullName}
+      echo "Image pushed successfully: ${imageFullName}"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: deploy
+spec:
+  params:
+  - name: imageFullName
+    type: string
+  - name: gitRepoName
+    type: string
+  workspaces:
+  - name: git-source
+    mountPath: /workspace
+  steps:
+  - name: update-yaml
+    image: 172.16.30.135/devops/alpine:latest
+    workingDir: $(workspaces.git-source.path)
+    script: |
+      #!/bin/sh
+      cd $(params.gitRepoName)
+      ls -l
+      sed -i -e \
+        "s@__IMAGE__@$(params.imageFullName)@g" \
+        mainfests/deployment.yaml
+      cat  mainfests/deployment.yaml
+  - name: deploy-by-kubectl
+    # image: lachlanevenson/k8s-kubectl:latest
+    image: 172.16.30.135/devops/kubectl:v1.25
+    workingDir: $(workspaces.git-source.path)
+    script: |
+      #!/bin/sh
+      cd $(params.gitRepoName)
+      cat  mainfests/deployment.yaml
+      kubectl apply -f  mainfests/deployment.yaml

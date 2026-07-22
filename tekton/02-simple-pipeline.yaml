@@ -1,0 +1,81 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: simple-pipeline
+spec:
+  params:
+  - name: gitRepoUrl
+    description: The Git URL to clone from
+  - name: gitRepoBranch
+    description: The Git revision to clone
+  - name: gitRepoName
+    description: The Git revision to clone
+  - name: buildCmd
+    description: build command for source
+  - name: gitRepoFullName
+    description: The git repo full name
+  - name: harborUrl
+    description: The harbor url
+  workspaces:
+  - name: git-source
+  tasks:
+  # 1. 拉取代码
+  - name: git-clone
+    taskRef:
+      name: checkout
+    params:
+    - name: gitRepoUrl
+      value: $(params.gitRepoUrl)
+    - name: gitRepoBranch
+      value: $(params.gitRepoBranch)
+    - name: gitRepoName
+      value: $(params.gitRepoName)
+    workspaces:
+      - name: git-source
+        workspace: git-source
+  # 2. 源码编译
+  - name: build-package
+    taskRef:
+      name: build
+    params:
+    - name: gitRepoName
+      value: $(params.gitRepoName)
+    - name: buildCmd
+      value: $(params.buildCmd)
+    workspaces:
+    - name: git-source
+      workspace: git-source
+    runAfter:
+    - git-clone
+  # 3. 构建镜像
+  - name: buildah-image
+    taskRef:
+      name: image
+    params:
+    - name: gitRepoFullName
+      value: $(params.gitRepoFullName)
+    - name: harborUrl
+      value: $(params.harborUrl)
+    - name: gitRepoName
+      value: $(params.gitRepoName)
+    workspaces:
+      - name: git-source
+        workspace: git-source
+    runAfter:
+    - build-package
+  # 4. 部署到集群
+  - name: kubectl-deploy
+    taskRef:
+      name: deploy
+    params:
+    - name: gitRepoName
+      value: $(params.gitRepoName)
+    - name: imageFullName
+      value: $(tasks.buildah-image.results.imageFullName)  
+    workspaces:
+      - name: git-source
+        workspace: git-source
+    runAfter:
+    - buildah-image
+

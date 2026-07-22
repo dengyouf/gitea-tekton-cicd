@@ -1,0 +1,16 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: pipeline-binding
+spec:
+  params:
+  - name: gitRepoUrl
+    value: $(body.repository.clone_url)
+  - name: gitRepoBranch
+    value: $(extensions.gitBranch) 
+  - name: gitRepoName
+    value: $(body.repository.name) # helloworld
+  - name: gitRepoFullName
+    value: $(body.repository.full_name) # devops/helloworld
+  - name: harborUrl
+    value: "172.16.30.135"

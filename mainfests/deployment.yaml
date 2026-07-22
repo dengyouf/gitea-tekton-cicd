@@ -1,0 +1,23 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloword
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: helloword
+  template:
+    metadata:
+      labels:
+        app: helloword
+    spec:
+      imagePullSecrets:
+      - name: registry-secret
+      containers:
+        - image: __IMAGE__
+          name: helloword
+          ports:
+            - containerPort: 8080

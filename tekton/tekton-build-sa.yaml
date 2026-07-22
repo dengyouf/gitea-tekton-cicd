@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-build-sa
+  namespace: default
+imagePullSecrets:
+  - name: registry-secret
+secrets:
+  - name: gitea-auth-secret

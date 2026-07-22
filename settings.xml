@@ -1,0 +1,35 @@
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0
+          https://maven.apache.org/xsd/settings-1.2.0.xsd">
+
+  <!-- Nexus 认证信息 -->
+  <servers>
+    <server>
+      <id>nexus-mirror</id>
+      <username>admin</username>
+      <password>dy6545286</password>
+    </server>
+    <server>
+      <id>nexus-releases</id>
+      <username>admin</username>
+      <password>dy6545286</password>
+    </server>
+    <server>
+      <id>nexus-snapshots</id>
+      <username>admin</username>
+      <password>dy6545286</password>
+    </server>
+  </servers>
+
+
+  <!-- Nexus 镜像配置 -->
+  <mirrors>
+    <mirror>
+      <id>nexus-mirror</id>
+      <mirrorOf>*</mirrorOf>
+      <!--<url>http://172.16.30.135:8081/repository/public/repository/</url> -->
+      <url>http://172.16.30.135:8081/repository/public/repository/</url>
+    </mirror>
+  </mirrors>
+</settings>

@@ -1,0 +1,53 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: pipeline-template
+spec:
+  params:
+  - name: gitRepoUrl
+    description: The git repository url
+  - name: gitRepoBranch
+    description: The git revision
+    default: main
+  - name: gitRepoName
+    description: The git repository name
+  - name: gitRepoFullName
+    description: The git repository full name
+  - name: harborUrl
+    description: The harbor url
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: simple-pipeline-run-
+    spec:
+      serviceAccountName: tekton-build-sa
+      taskRunSpecs:
+      - pipelineTaskName: kubectl-deploy
+        #serviceAccountName: tekton-deploy-sa
+        taskServiceAccountName: tekton-deploy-sa
+      pipelineRef:
+        name: simple-pipeline
+      params:
+      - name: gitRepoUrl
+        value: $(tt.params.gitRepoUrl)
+      - name: gitRepoBranch
+        value: $(tt.params.gitRepoBranch)
+      - name: gitRepoName
+        value: $(tt.params.gitRepoName)
+      - name: buildCmd
+        value: mvn clean package -DskipTests -U -s settings.xml
+      - name: gitRepoFullName
+        value: $(tt.params.gitRepoFullName)
+      - name: harborUrl
+        value: $(tt.params.harborUrl)
+      workspaces:
+      - name: git-source
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi  # 根据需要调整存储大小
+            storageClassName: nfs-client  # 指定你的存储类

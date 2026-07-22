@@ -1,0 +1,22 @@
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: listener
+spec:
+  serviceAccountName: tekton-triggers-sa
+  triggers:
+    - name: gitea-push-trigger
+      interceptors:
+        - ref:
+            name: cel
+          params:
+            - name: overlays
+              value:
+                - key: gitBranch
+                  expression: "body.ref.split('/').last()"
+      bindings:
+        - ref: pipeline-binding
+        - ref: message-binding
+      template:
+        ref: pipeline-template
